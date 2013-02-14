@@ -11,36 +11,47 @@ my $timeout = 20;
 
 sub nsdc_conn {
 	my $sock;
-	local $SIG{ALRM} = sub { die "alarm\n" };
-	eval {
-		alarm ($timeout);
-		$sock = IO::Socket::SSL->new (
-			PeerAddr => 'localhost',
-			PeerPort => '8952',
-			Proto    => 'tcp',
-			SSL_use_cert => 1,
-			SSL_key_file => "/usr/local/etc/nsd/nsd_control.key",
-			SSL_cert_file => "/usr/local/etc/nsd/nsd_control.pem"
-			);
-		if (!$sock) {
-			die ("conn\n");
-		}
-		return 1;
 
+	eval {
+		local $SIG{ALRM} = sub { die "alarm\n" };
+
+		eval {
+			alarm ($timeout);
+			$sock = IO::Socket::SSL->new (
+				PeerAddr => 'localhost',
+				PeerPort => '8952',
+				Proto    => 'tcp',
+				SSL_use_cert => 1,
+				SSL_key_file => "/usr/local/etc/nsd/nsd_control.key",
+				SSL_cert_file => "/usr/local/etc/nsd/nsd_control.pem"
+				);
+			alarm (0);
+			die "conn\n" unless $sock;
+
+			return 1; # for eval
+		} or do {
+			alarm (0);
+			my $err = $@;
+			return unless $err;
+			die $err;
+		};
+
+		alarm (0);
+		return 1; # for eval
 	} or do {
 		alarm (0);
 		my $err = $@;
-		if ($err) {
-			if ($err =~ /^conn/) {
-				print "connection failed!\n";
-				print &IO::Socket::SSL::errstr () . "\n";
-				exit (2);
-			}
+		return unless $err;
 
-			if ($err =~ /^alarm/) {
-				print "connection timeout!\n";
-				exit (3);
-			}
+		if ($err =~ /^conn/) {
+			print "connection failed!\n";
+			print &IO::Socket::SSL::errstr () . "\n";
+			exit (2);
+		}
+
+		if ($err =~ /^alarm/) {
+			print "connection timeout!\n";
+			exit (3);
 		}
 	};
 
@@ -85,7 +96,7 @@ sub main {
 }
 
 if ($#ARGV < 0) {
-	print " Usage: nsd-batch.pl <list of domains>";
+	print " Usage: nsd-batch.pl <list of domains>\n";
 	exit (1);
 }
 
