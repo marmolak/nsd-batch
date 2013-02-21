@@ -53,6 +53,8 @@ sub nsdc_conn {
 			print "connection timeout!\n";
 			exit (3);
 		}
+
+		die $err;
 	};
 
 	return $sock;
